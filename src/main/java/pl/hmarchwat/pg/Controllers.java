@@ -4,6 +4,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Pos;
 import javafx.scene.control.DatePicker;
 
 import java.io.IOException;
@@ -25,6 +26,8 @@ public class Controllers implements Initializable {
     @FXML
     private Label message;
     @FXML
+    private Label infoLabel;
+    @FXML
     private DatePicker dateSelection;
     @FXML
     private TableView<ExchangeRate> rateTable = new TableView<>();
@@ -33,6 +36,7 @@ public class Controllers implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        infoLabel.setText("Notowania kursu dla waluty:");
         //Tworzenie kolumn
         TableColumn<ExchangeRate,?> dateColumn=new TableColumn<>("Data");
         dateColumn.setMinWidth(85);
@@ -64,6 +68,7 @@ public class Controllers implements Initializable {
             if(nbpusdURL.getResponseCode()==200){
                 setMessage("");
                 JSONObject jsonObject=nbpusdURL.getJSONObject();
+                infoLabel.setText("Notowania kursu dla waluty: "+ jsonObject.get("currency"));
                 generateColumns(jsonObject);
             }else if(nbpusdURL.getResponseCode()==400){
                 //błąd 400 = przekroczony limit 93 dni
