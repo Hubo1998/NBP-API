@@ -3,15 +3,15 @@ package pl.hmarchwat.pg;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
 import javafx.scene.control.DatePicker;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 
-import java.util.Scanner;
+import java.util.ResourceBundle;
 
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
@@ -19,87 +19,71 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-public class Controllers {
+public class Controllers implements Initializable {
     @FXML
     private Label message;
     @FXML
-    private DatePicker datePicker;
+    private DatePicker dateSelection;
     @FXML
-    private TableView<ExchangeRate> tableView= new TableView<>();
+    private TableView<ExchangeRate> rateTable = new TableView<>();
+    @FXML
     private final LocalDate today= LocalDate.now();
 
-    @FXML
-    private void dateChange() throws IOException, ParseException {
-        LocalDate chosenDate=datePicker.getValue();
-        if(chosenDate.toEpochDay()>=today.toEpochDay()){
-            message.setText("Wybierz datę z przeszłości.");
-        }else {
-            String stringUrlAdress="http://api.nbp.pl/api/exchangerates/rates/c/usd/"+chosenDate+"/"+today+"/?format=json";
-            URL url=new URL(stringUrlAdress);
-            Integer responseCode=getConnection(url);
-            //sprawdzanie połączenia kod 200=OK
-            if(responseCode==200){
-                StringBuilder textFromSite=scanURL(url);
-                JSONObject jsonObject=getJSONObject(textFromSite.toString());
-                JSONArray jsonArray=(JSONArray) jsonObject.get("rates");
-                generateColumns(jsonArray);
-            }else if(responseCode==400){
-                message.setText("Spróbuj wybrać późniejszą datę");
-            }else{
-                throw new RuntimeException("Błąd HTTP:"+responseCode);
-            }
-        }
-    }
-    public Integer getConnection(URL url) throws IOException {
-        HttpURLConnection connection= (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.connect();
-        return connection.getResponseCode();
-    }
-    public StringBuilder scanURL(URL url) throws IOException {
-        StringBuilder URLtext= new StringBuilder();
-        Scanner scanner=new Scanner(url.openStream());
-        while (scanner.hasNext()){
-            URLtext.append(scanner.nextLine());
-        }
-        scanner.close();
-        return URLtext;
-    }
-    public JSONObject getJSONObject(String URLtext) throws ParseException {
-        //przetwarzanie wczytanego tekstu ze strony jako obiekt JSON
-        JSONParser parser=new JSONParser();
-        return (JSONObject) parser.parse(URLtext);
-    }
-    public void generateColumns(JSONArray array){
-
+    @Override
+    public void initialize(URL url, ResourceBundle resourceBundle) {
+        //Tworzenie kolumn
         TableColumn<ExchangeRate,?> dateColumn=new TableColumn<>("Data");
-        dateColumn.setMinWidth(100);
+        dateColumn.setMinWidth(85);
+        //przypisanie pól obiektu do kolumn tabeli
         dateColumn.setCellValueFactory(new PropertyValueFactory<>("exchangeDate"));
 
         TableColumn<ExchangeRate,?> bidColumn=new TableColumn<>("Kupno");
-        bidColumn.setMinWidth(100);
+        bidColumn.setMinWidth(120);
         bidColumn.setCellValueFactory(new PropertyValueFactory<>("bid"));
 
         TableColumn<ExchangeRate,?> askColumn=new TableColumn<>("Sprzedaż");
-        askColumn.setMinWidth(100);
+        askColumn.setMinWidth(120);
         askColumn.setCellValueFactory(new PropertyValueFactory<>("ask"));
 
-        tableView.getColumns().set(0,dateColumn);
-        tableView.getColumns().set(1,bidColumn);
-        tableView.getColumns().set(2,askColumn);
+        //dodanie kolumn do tabeli
+        rateTable.getColumns().add(0,dateColumn);
+        rateTable.getColumns().add(1,bidColumn);
+        rateTable.getColumns().add(2,askColumn);
+    }
 
+    public void dateChange() throws IOException, ParseException {
+        LocalDate chosenDate= dateSelection.getValue();
+        if(chosenDate.toEpochDay()>=today.toEpochDay()){
+            setMessage("Wybierz datę z przeszłości.");
+        }else {
+            String stringUrlAdress="http://api.nbp.pl/api/exchangerates/rates/c/usd/"+chosenDate+"/"+today+"/?format=json";
+            URLConnection nbpusdURL=new URLConnection(new URL(stringUrlAdress));
+            //sprawdzanie połączenia kod 200=OK
+            if(nbpusdURL.getResponseCode()==200){
+                setMessage("");
+                JSONObject jsonObject=nbpusdURL.getJSONObject();
+                generateColumns(jsonObject);
+            }else if(nbpusdURL.getResponseCode()==400){
+                //błąd 400 = przekroczony limit 93 dni
+                setMessage("Spróbuj wybrać późniejszą datę");
+            }else{
+                throw new RuntimeException("Błąd HTTP:"+nbpusdURL.getResponseCode());
+            }
+        }
+    }
+
+    public void generateColumns(JSONObject object){
+        JSONArray jsonArray=(JSONArray) object.get("rates");
         ObservableList<ExchangeRate> individualObjectsList= FXCollections.observableArrayList();
-
         //dla pierwszej iteracji brak różnicy wartości.
         Double bid0=0.0;
         Double ask0=0.0;
         DecimalFormat df=new DecimalFormat("#.####");
-        for (int i=0;i<array.size();i++) {
+        for (int i=0;i<jsonArray.size();i++) {
             //przetwarzamy wszystkie istniejące obiekty w tabeli rates.
-            JSONObject individualObject = (JSONObject) array.get(i);
+            JSONObject individualObject = (JSONObject) jsonArray.get(i);
             String exchangeDate= (String) individualObject.get("effectiveDate");
             Double bid1 = (Double) individualObject.get("bid");
             Double ask1 = (Double) individualObject.get("ask");
@@ -119,6 +103,9 @@ public class Controllers {
             }
             individualObjectsList.add(new ExchangeRate(exchangeDate,bidString,askString));
         }
-        tableView.setItems(individualObjectsList);
+        rateTable.setItems(individualObjectsList);
+    }
+    public void setMessage(String text){
+        message.setText(text);
     }
 }
