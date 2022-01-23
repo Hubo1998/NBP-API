@@ -10,4 +10,16 @@ public class ExchangeRate {
         this.bid = bid;
         this.ask = ask;
     }
+
+    public String getExchangeDate() {
+        return exchangeDate;
+    }
+
+    public String getBid() {
+        return bid;
+    }
+
+    public String getAsk() {
+        return ask;
+    }
 }
